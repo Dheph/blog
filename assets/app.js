@@ -189,6 +189,16 @@
       $("[data-post-body]").textContent = md;
     }
     if (window.hljs) $$("pre code", $("[data-post-body]")).forEach((b) => hljs.highlightElement(b));
+    // diagramas largos (horizontais): rolagem horizontal no mobile p/ não virar texto ilegível
+    $$("[data-post-body] svg").forEach((svg) => {
+      if (svg.parentElement?.classList.contains("svg-scroll")) return;
+      const vb = (svg.getAttribute("viewBox") || "").split(/\s+/).map(Number);
+      const wide = vb.length === 4 && vb[3] && vb[2] / vb[3] >= 2;
+      const wrap = document.createElement("div");
+      wrap.className = "svg-scroll" + (wide ? " wide" : "");
+      svg.parentNode.insertBefore(wrap, svg);
+      wrap.appendChild(svg);
+    });
     $$("[data-tagjump]").forEach((a) => a.addEventListener("click", () => {
       activeTag = a.dataset.tagjump; renderTags(); renderList();
     }));
