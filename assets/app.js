@@ -1,4 +1,4 @@
-/* Blog SPA — vanilla JS, hash routing, client-side search.
+/* Blog SPA — vanilla JS, hash routing, busca client-side, i18n (pt/en/es).
    Lê config.json + posts.json (gerado por scripts/build.mjs) e renderiza os .md de posts/. */
 (() => {
   "use strict";
@@ -13,126 +13,175 @@
     instagram: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none"/></svg>',
   };
 
+  const UI = {
+    pt: {
+      locale: "pt-BR", search: "Pesquisar posts…  (pressione /)", read: "min de leitura",
+      back: "← voltar", empty: "Nenhum post encontrado.", loading: "Carregando…",
+      notfound: "Post não encontrado.", notfoundBack: "Voltar ao início",
+      error: "Erro ao carregar o blog. Rode `npm run build` e confira config.json / posts.json.",
+      langFull: { pt: "Português", en: "Inglês", es: "Espanhol" },
+      note: (l) => `Este post ainda não foi traduzido — exibindo em ${UI.pt.langFull[l]}.`,
+    },
+    en: {
+      locale: "en-US", search: "Search posts…  (press /)", read: "min read",
+      back: "← back", empty: "No posts found.", loading: "Loading…",
+      notfound: "Post not found.", notfoundBack: "Back to home",
+      error: "Failed to load the blog. Run `npm run build` and check config.json / posts.json.",
+      langFull: { pt: "Portuguese", en: "English", es: "Spanish" },
+      note: (l) => `This post isn't translated yet — showing the ${UI.en.langFull[l]} version.`,
+    },
+    es: {
+      locale: "es-ES", search: "Buscar posts…  (pulsa /)", read: "min de lectura",
+      back: "← volver", empty: "No se encontraron posts.", loading: "Cargando…",
+      notfound: "Post no encontrado.", notfoundBack: "Volver al inicio",
+      error: "Error al cargar el blog. Ejecuta `npm run build` y revisa config.json / posts.json.",
+      langFull: { pt: "Portugués", en: "Inglés", es: "Español" },
+      note: (l) => `Este post aún no está traducido — mostrando la versión en ${UI.es.langFull[l]}.`,
+    },
+  };
+
   const $ = (s, el = document) => el.querySelector(s);
   const $$ = (s, el = document) => [...el.querySelectorAll(s)];
-  const views = {
-    list: $('[data-view="list"]'),
-    post: $('[data-view="post"]'),
-  };
+  const views = { list: $('[data-view="list"]'), post: $('[data-view="post"]') };
   const el = {
-    loading: $('[data-loading]'),
-    notfound: $('[data-notfound]'),
-    list: $('[data-post-list]'),
-    empty: $('[data-empty]'),
-    tags: $('[data-tags]'),
-    search: $('#search'),
+    loading: $('[data-loading]'), notfound: $('[data-notfound]'),
+    list: $('[data-post-list]'), empty: $('[data-empty]'),
+    tags: $('[data-tags]'), search: $('#search'),
+    langSwitch: $('[data-lang-switch]'), langNote: $('[data-lang-note]'),
   };
 
   let CONFIG = {};
   let POSTS = [];
+  let LANGS = ["pt"];
+  let DEFAULT_LANG = "pt";
+  let lang = "pt";
   let activeTag = null;
 
+  const t = () => UI[lang] || UI.pt;
   const fmtDate = (iso) => {
     try {
-      return new Date(iso + "T00:00:00").toLocaleDateString(CONFIG.lang || "pt-BR", {
-        day: "2-digit", month: "long", year: "numeric",
-      });
+      return new Date(iso + "T00:00:00").toLocaleDateString(t().locale, { day: "2-digit", month: "long", year: "numeric" });
     } catch { return iso; }
   };
   const esc = (s) => (s || "").replace(/[&<>"']/g, (c) =>
     ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  // escolhe o texto do post no idioma atual, com fallback
+  const pick = (post) => {
+    const used = post.i18n[lang] ? lang : (post.i18n[DEFAULT_LANG] ? DEFAULT_LANG : post.langs[0]);
+    return { data: post.i18n[used], usedLang: used, translated: used === lang };
+  };
+  // escolhe string/objeto multilíngue (ex.: subtitle)
+  const pickStr = (v) => (v && typeof v === "object" ? (v[lang] ?? v[DEFAULT_LANG] ?? Object.values(v)[0] ?? "") : (v || ""));
 
-  /* ---------- tema ---------- */
-  function initTheme() {
-    const saved = (() => { try { return localStorage.getItem("blog-theme"); } catch { return null; } })();
-    if (saved === "light" || saved === "dark") document.documentElement.setAttribute("data-theme", saved);
-    $('[data-theme-toggle]')?.addEventListener("click", () => {
-      const cur = document.documentElement.getAttribute("data-theme");
-      const isDark = cur ? cur === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
-      const next = isDark ? "light" : "dark";
-      document.documentElement.setAttribute("data-theme", next);
-      try { localStorage.setItem("blog-theme", next); } catch {}
-    });
+  /* ---------- idioma ---------- */
+  function detectLang() {
+    let saved = null;
+    try { saved = localStorage.getItem("blog-lang"); } catch {}
+    if (saved && LANGS.includes(saved)) return saved;
+    for (const nav of (navigator.languages || [navigator.language || ""])) {
+      const code = nav.slice(0, 2).toLowerCase();
+      if (LANGS.includes(code)) return code;
+    }
+    return DEFAULT_LANG;
+  }
+  function setLang(next) {
+    if (!LANGS.includes(next) || next === lang) return;
+    lang = next;
+    try { localStorage.setItem("blog-lang", lang); } catch {}
+    document.documentElement.lang = lang;
+    renderLangSwitch();
+    applyConfig();
+    activeTag = null;
+    renderTags();
+    renderList();
+    route(); // re-renderiza o post aberto, se houver
+  }
+  function renderLangSwitch() {
+    el.langSwitch.innerHTML = LANGS.map((l) =>
+      `<button class="lang-btn" data-lang="${l}" aria-pressed="${l === lang}" title="${esc(t().langFull[l] || l)}">${l.toUpperCase()}</button>`
+    ).join("");
+    $$("[data-lang]", el.langSwitch).forEach((b) =>
+      b.addEventListener("click", () => setLang(b.dataset.lang)));
   }
 
   /* ---------- config / links ---------- */
   function applyConfig() {
     document.title = CONFIG.title || "Blog";
-    if (CONFIG.lang) document.documentElement.lang = CONFIG.lang;
     $$("[data-site-title]").forEach((n) => (n.textContent = CONFIG.title || "Blog"));
-    $$("[data-site-subtitle]").forEach((n) => (n.textContent = CONFIG.subtitle || ""));
+    $$("[data-site-subtitle]").forEach((n) => (n.textContent = pickStr(CONFIG.subtitle)));
     $$("[data-site-author]").forEach((n) => (n.textContent = CONFIG.author || CONFIG.title || ""));
     $("[data-year]").textContent = new Date().getFullYear();
-    const linksHTML = (CONFIG.links || []).map((l) =>
-      `<a href="${esc(l.url)}" ${l.url.startsWith("mailto:") ? "" : 'target="_blank" rel="noopener"'} title="${esc(l.label)}" aria-label="${esc(l.label)}">${ICONS[l.icon] || esc(l.label)}</a>`
-    ).join("");
-    $("[data-social]").innerHTML = linksHTML;
-    $("[data-social-footer]").innerHTML = (CONFIG.links || []).map((l) =>
-      `<a href="${esc(l.url)}" ${l.url.startsWith("mailto:") ? "" : 'target="_blank" rel="noopener"'}>${esc(l.label)}</a>`
-    ).join("");
+    el.search.placeholder = t().search;
+    $$('[data-i18n="back"]').forEach((n) => (n.textContent = t().back));
+    el.empty.textContent = t().empty;
+    const linkHTML = (l, withIcon) =>
+      `<a href="${esc(l.url)}" ${l.url.startsWith("mailto:") ? "" : 'target="_blank" rel="noopener"'} title="${esc(l.label)}" aria-label="${esc(l.label)}">${withIcon ? (ICONS[l.icon] || esc(l.label)) : esc(l.label)}</a>`;
+    $("[data-social]").innerHTML = (CONFIG.links || []).map((l) => linkHTML(l, true)).join("");
+    $("[data-social-footer]").innerHTML = (CONFIG.links || []).map((l) => linkHTML(l, false)).join("");
   }
 
   /* ---------- lista ---------- */
   function renderTags() {
     const counts = {};
-    POSTS.forEach((p) => (p.tags || []).forEach((t) => (counts[t] = (counts[t] || 0) + 1)));
+    POSTS.forEach((p) => pick(p).data.tags.forEach((tg) => (counts[tg] = (counts[tg] || 0) + 1)));
     const tags = Object.keys(counts).sort((a, b) => counts[b] - counts[a]);
-    el.tags.innerHTML = tags.map((t) =>
-      `<button class="tag-chip" data-tag="${esc(t)}" aria-pressed="${activeTag === t}">${esc(t)} · ${counts[t]}</button>`
+    el.tags.innerHTML = tags.map((tg) =>
+      `<button class="tag-chip" data-tag="${esc(tg)}" aria-pressed="${activeTag === tg}">${esc(tg)} · ${counts[tg]}</button>`
     ).join("");
     $$("[data-tag]", el.tags).forEach((b) =>
       b.addEventListener("click", () => {
         activeTag = activeTag === b.dataset.tag ? null : b.dataset.tag;
-        renderTags();
-        renderList();
-      })
-    );
+        renderTags(); renderList();
+      }));
   }
 
   function renderList() {
     const q = el.search.value.trim().toLowerCase();
     const terms = q.split(/\s+/).filter(Boolean);
-    let items = POSTS.slice();
-    if (activeTag) items = items.filter((p) => (p.tags || []).includes(activeTag));
+    let items = POSTS.map((p) => ({ post: p, ...pick(p) }));
+    if (activeTag) items = items.filter((x) => x.data.tags.includes(activeTag));
     if (terms.length) {
-      items = items.filter((p) => {
-        const hay = `${p.title} ${p.description} ${(p.tags || []).join(" ")} ${p.text || ""}`.toLowerCase();
-        return terms.every((t) => hay.includes(t));
+      items = items.filter((x) => {
+        const d = x.data;
+        const hay = `${d.title} ${d.description} ${d.tags.join(" ")} ${d.text || ""}`.toLowerCase();
+        return terms.every((term) => hay.includes(term));
       });
     }
     el.empty.hidden = items.length > 0;
-    el.list.innerHTML = items.map((p) => `
-      <a class="post-card" href="#/post/${esc(p.slug)}">
-        <h2 class="post-card-title">${esc(p.title)}</h2>
-        ${p.description ? `<p class="post-card-desc">${esc(p.description)}</p>` : ""}
+    el.list.innerHTML = items.map(({ post, data, translated, usedLang }) => `
+      <a class="post-card" href="#/post/${esc(post.slug)}">
+        <h2 class="post-card-title">${esc(data.title)}</h2>
+        ${data.description ? `<p class="post-card-desc">${esc(data.description)}</p>` : ""}
         <div class="post-card-meta">
-          <time datetime="${esc(p.date)}">${fmtDate(p.date)}</time>
-          <span class="dot"></span><span>${p.reading} min de leitura</span>
-          ${(p.tags || []).map((t) => `<span class="chip-mini">${esc(t)}</span>`).join("")}
+          <time datetime="${esc(post.date)}">${fmtDate(post.date)}</time>
+          <span class="dot"></span><span>${data.reading} ${t().read}</span>
+          ${!translated ? `<span class="chip-lang" title="${esc(t().langFull[usedLang])}">${usedLang.toUpperCase()}</span>` : ""}
+          ${data.tags.map((tg) => `<span class="chip-mini">${esc(tg)}</span>`).join("")}
         </div>
       </a>`).join("");
   }
 
   /* ---------- post ---------- */
   async function renderPost(slug) {
-    const meta = POSTS.find((p) => p.slug === slug);
-    if (!meta) return showNotFound();
+    const post = POSTS.find((p) => p.slug === slug);
+    if (!post) return showNotFound();
+    const { data, usedLang, translated } = pick(post);
     let md;
     try {
-      const res = await fetch(`posts/${meta.file}`, { cache: "no-cache" });
+      const res = await fetch(`posts/${data.file}`, { cache: "no-cache" });
       if (!res.ok) throw new Error(res.status);
       md = await res.text();
-    } catch {
-      return showNotFound();
-    }
+    } catch { return showNotFound(); }
     md = stripFrontmatter(md);
-    document.title = `${meta.title} — ${CONFIG.title || "Blog"}`;
-    $("[data-post-title]").textContent = meta.title;
-    $("[data-post-date]").textContent = fmtDate(meta.date);
-    $("[data-post-date]").setAttribute("datetime", meta.date);
-    $("[data-post-reading]").textContent = `${meta.reading} min de leitura`;
-    $("[data-post-tags]").innerHTML = (meta.tags || []).map((t) =>
-      `<a class="chip-mini" href="#/" data-tagjump="${esc(t)}">${esc(t)}</a>`).join("");
+    document.title = `${data.title} — ${CONFIG.title || "Blog"}`;
+    $("[data-post-title]").textContent = data.title;
+    $("[data-post-date]").textContent = fmtDate(post.date);
+    $("[data-post-date]").setAttribute("datetime", post.date);
+    $("[data-post-reading]").textContent = `${data.reading} ${t().read}`;
+    $("[data-post-tags]").innerHTML = data.tags.map((tg) =>
+      `<a class="chip-mini" href="#/" data-tagjump="${esc(tg)}">${esc(tg)}</a>`).join("");
+    el.langNote.hidden = translated;
+    if (!translated) el.langNote.textContent = t().note(usedLang);
     if (window.marked) {
       marked.setOptions({ breaks: false, gfm: true });
       $("[data-post-body]").innerHTML = marked.parse(md);
@@ -153,30 +202,40 @@
 
   /* ---------- roteamento ---------- */
   function show(view) {
-    el.loading.hidden = true;
-    el.notfound.hidden = true;
+    el.loading.hidden = true; el.notfound.hidden = true;
     views.list.hidden = view !== "list";
     views.post.hidden = view !== "post";
   }
   function showNotFound() {
-    el.loading.hidden = true;
-    views.list.hidden = true;
-    views.post.hidden = true;
+    el.loading.hidden = true; views.list.hidden = true; views.post.hidden = true;
     el.notfound.hidden = false;
+    el.notfound.innerHTML = `${esc(t().notfound)} <a href="#/">${esc(t().notfoundBack)}</a>.`;
   }
-
   function route() {
     const hash = location.hash.replace(/^#/, "") || "/";
     const m = hash.match(/^\/post\/(.+)$/);
     if (m) renderPost(decodeURIComponent(m[1]));
-    else { show("list"); }
+    else show("list");
+  }
+
+  /* ---------- tema ---------- */
+  function initTheme() {
+    let saved = null; try { saved = localStorage.getItem("blog-theme"); } catch {}
+    if (saved === "light" || saved === "dark") document.documentElement.setAttribute("data-theme", saved);
+    $('[data-theme-toggle]')?.addEventListener("click", () => {
+      const cur = document.documentElement.getAttribute("data-theme");
+      const isDark = cur ? cur === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+      const next = isDark ? "light" : "dark";
+      document.documentElement.setAttribute("data-theme", next);
+      try { localStorage.setItem("blog-theme", next); } catch {}
+    });
   }
 
   /* ---------- atalhos ---------- */
   function initShortcuts() {
     document.addEventListener("keydown", (e) => {
-      if (e.key === "/" && document.activeElement !== el.search) {
-        if (!views.list.hidden) { e.preventDefault(); el.search.focus(); }
+      if (e.key === "/" && document.activeElement !== el.search && !views.list.hidden) {
+        e.preventDefault(); el.search.focus();
       } else if (e.key === "Escape" && document.activeElement === el.search) {
         el.search.value = ""; renderList(); el.search.blur();
       }
@@ -194,12 +253,17 @@
         fetch("posts.json", { cache: "no-cache" }).then((r) => r.json()),
       ]);
       CONFIG = cfg;
+      LANGS = Array.isArray(cfg.languages) && cfg.languages.length ? cfg.languages : ["pt"];
+      DEFAULT_LANG = cfg.defaultLang && LANGS.includes(cfg.defaultLang) ? cfg.defaultLang : LANGS[0];
       POSTS = (posts || []).sort((a, b) => (a.date < b.date ? 1 : -1));
     } catch (e) {
-      el.loading.textContent = "Erro ao carregar o blog. Rode `npm run build` e confira config.json / posts.json.";
+      el.loading.textContent = t().error;
       console.error(e);
       return;
     }
+    lang = detectLang();
+    document.documentElement.lang = lang;
+    renderLangSwitch();
     applyConfig();
     renderTags();
     renderList();
@@ -207,7 +271,6 @@
     route();
   }
 
-  if (document.readyState === "loading")
-    document.addEventListener("DOMContentLoaded", boot);
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot);
   else boot();
 })();

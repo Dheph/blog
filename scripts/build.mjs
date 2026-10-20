@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 /* Gera posts.json a partir dos .md em posts/.
-   Frontmatter YAML simples suportado: title, date, tags, description, draft.
+   Esquema multilíngue: cada post é um arquivo por idioma, <slug>.<lang>.md
+   com lang ∈ {pt, en, es}. Arquivo sem sufixo de idioma vira o idioma padrão.
+   Frontmatter YAML simples: title, date, tags, description, draft.
    Sem dependências. */
 import { readdir, readFile, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
@@ -8,6 +10,8 @@ import { dirname, join } from "node:path";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const POSTS_DIR = join(ROOT, "posts");
+const LANGS = ["pt", "en", "es"];
+const DEFAULT_LANG = "pt";
 
 function parseFrontmatter(raw) {
   const m = raw.replace(/^﻿/, "").match(/^---\s*\r?\n([\s\S]*?)\r?\n---\s*\r?\n?/);
@@ -36,8 +40,11 @@ function slugify(s) {
     .toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
 }
 
+/* texto puro p/ busca: remove código, html/svg, imagens, marcação */
 function plain(md) {
   return md
+    .replace(/<svg[\s\S]*?<\/svg>/gi, " ")
+    .replace(/<[^>]+>/g, " ")
     .replace(/```[\s\S]*?```/g, " ")
     .replace(/`[^`]*`/g, " ")
     .replace(/!\[[^\]]*\]\([^)]*\)/g, " ")
@@ -47,6 +54,14 @@ function plain(md) {
     .trim();
 }
 
+function parseName(file) {
+  const m = file.match(/^(.+?)\.([a-z]{2})\.md$/i);
+  if (m && LANGS.includes(m[2].toLowerCase())) {
+    return { base: m[1], lang: m[2].toLowerCase() };
+  }
+  return { base: file.replace(/\.md$/i, ""), lang: DEFAULT_LANG };
+}
+
 async function main() {
   let files;
   try {
@@ -54,18 +69,15 @@ async function main() {
   } catch {
     files = [];
   }
-  const posts = [];
-  const seen = new Set();
+
+  const bySlug = new Map();
 
   for (const file of files) {
+    const { base, lang } = parseName(file);
+    const slug = slugify(base);
     const raw = await readFile(join(POSTS_DIR, file), "utf8");
     const { data, body } = parseFrontmatter(raw);
     if (String(data.draft).toLowerCase() === "true") continue;
-
-    const base = file.replace(/\.md$/i, "");
-    let slug = slugify(data.slug || base);
-    if (seen.has(slug)) slug = `${slug}-${posts.length}`;
-    seen.add(slug);
 
     const title = data.title || base.replace(/[-_]/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
     const text = plain(body);
@@ -74,22 +86,38 @@ async function main() {
     const description = data.description ||
       (text.length > 160 ? text.slice(0, 157).replace(/\s+\S*$/, "") + "…" : text);
 
-    let date = data.date;
-    if (!date) {
-      const d = new Date();
-      date = d.toISOString().slice(0, 10);
-    }
-
-    posts.push({
-      slug, file, title, date,
+    const entry = {
+      title, description, reading, file,
       tags: Array.isArray(data.tags) ? data.tags : (data.tags ? [data.tags] : []),
-      description, reading, text: text.slice(0, 4000),
-    });
+      text: text.slice(0, 4000),
+      _date: data.date || null,
+    };
+
+    if (!bySlug.has(slug)) bySlug.set(slug, { slug, i18n: {} });
+    bySlug.get(slug).i18n[lang] = entry;
   }
 
-  posts.sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : a.title.localeCompare(b.title)));
+  const posts = [];
+  for (const post of bySlug.values()) {
+    const langs = LANGS.filter((l) => post.i18n[l]);
+    if (!langs.length) continue;
+    // data: prefere o idioma padrão, senão o primeiro disponível
+    const dateSrc = post.i18n[DEFAULT_LANG] || post.i18n[langs[0]];
+    const date = dateSrc._date || new Date().toISOString().slice(0, 10);
+    for (const l of langs) delete post.i18n[l]._date;
+    posts.push({ slug: post.slug, date, langs, i18n: post.i18n });
+  }
+
+  posts.sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : a.slug.localeCompare(b.slug)));
   await writeFile(join(ROOT, "posts.json"), JSON.stringify(posts, null, 2) + "\n", "utf8");
-  console.log(`✓ posts.json gerado — ${posts.length} post(s).`);
+
+  const total = posts.length;
+  const translations = posts.reduce((n, p) => n + p.langs.length, 0);
+  console.log(`✓ posts.json gerado — ${total} post(s), ${translations} versão(ões) de idioma.`);
+  for (const p of posts) {
+    const missing = LANGS.filter((l) => !p.langs.includes(l));
+    if (missing.length) console.log(`  · ${p.slug}: faltam [${missing.join(", ")}]`);
+  }
 }
 
 main().catch((e) => { console.error(e); process.exit(1); });

@@ -1,9 +1,13 @@
 {
   "title": "Jeffersom Ribeiro",
-  "subtitle": "Notas de dev mobile & fullstack — React Native, TypeScript, Node.",
+  "subtitle": {
+    "pt": "Notas de dev mobile & fullstack — React Native, TypeScript, Node.",
+    "en": "Notes from a mobile & fullstack dev — React Native, TypeScript, Node.",
+    "es": "Notas de un dev mobile & fullstack — React Native, TypeScript, Node."
+  },
   "author": "Jeffersom Ribeiro",
-  "lang": "pt-BR",
-  "basePath": "/blog/",
+  "defaultLang": "pt",
+  "languages": ["pt", "en", "es"],
   "links": [
     { "label": "Portfólio", "url": "https://dheph.github.io/portfolio/", "icon": "globe" },
     { "label": "GitHub", "url": "https://github.com/Dheph", "icon": "github" },
