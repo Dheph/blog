@@ -1,0 +1,13 @@
+{
+  "title": "Jeffersom Ribeiro",
+  "subtitle": "Notas de dev mobile & fullstack — React Native, TypeScript, Node.",
+  "author": "Jeffersom Ribeiro",
+  "lang": "pt-BR",
+  "basePath": "/blog/",
+  "links": [
+    { "label": "Portfólio", "url": "https://dheph.github.io/portfolio/", "icon": "globe" },
+    { "label": "GitHub", "url": "https://github.com/Dheph", "icon": "github" },
+    { "label": "LinkedIn", "url": "https://www.linkedin.com/in/jeffersom-ribeiro", "icon": "linkedin" },
+    { "label": "E-mail", "url": "mailto:jeffersom.ribeiro@outlook.com", "icon": "mail" }
+  ]
+}

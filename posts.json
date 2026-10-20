@@ -1,0 +1,29 @@
+[
+  {
+    "slug": "como-usar-este-blog",
+    "file": "como-usar-este-blog.md",
+    "title": "Como usar este blog",
+    "date": "2026-10-20",
+    "tags": [
+      "meta",
+      "guia"
+    ],
+    "description": "Postar, editar e remover é só mexer em arquivos .md e dar push. Zero painel, zero banco de dados.",
+    "reading": 1,
+    "text": "Este blog é gerenciado pelo próprio git . Não existe painel admin nem banco de dados: cada post é um arquivo na pasta . Postar é criar um arquivo e dar . Adicionar um post Ou crie o na mão. O começo do arquivo (frontmatter) define os metadados: Depois: O GitHub Action regenera o índice e publica sozinho. Em 1 min está no ar. Editar Abra o , altere, , commit, push. O histórico de edições fica no próprio git. Remover Preview local O que dá pra usar no Markdown Títulos, negrito , itálico , listas e blocos com destaque de sintaxe Tabelas, citações, imagens, links Dica: a busca (atalho ) varre título, descrição, tags e o texto do post. As tags no topo filtram a lista. É isso. Simples de propósito."
+  },
+  {
+    "slug": "offline-first-react-native",
+    "file": "offline-first-react-native.md",
+    "title": "Offline-first em React Native: o que aprendi em produção",
+    "date": "2026-10-18",
+    "tags": [
+      "react-native",
+      "offline-first",
+      "arquitetura"
+    ],
+    "description": "Fila de sincronização, resolução de conflitos e as armadilhas de assumir que o app sempre tem rede.",
+    "reading": 1,
+    "text": "Boa parte dos apps que entreguei roda em cenários com rede instável — campo, galpão, interior. \"Offline first\" deixou de ser enfeite e virou requisito. Aqui vão as decisões que se pagaram. O estado local é a fonte da verdade A tela lê sempre do banco local (SQLite, SmartStore ou Redux Persist). A rede é um detalhe de sincronização em segundo plano, nunca um bloqueio de UI. Isso muda o jeito de pensar: você não \"busca e mostra\", você \"mostra e reconcilia\". Fila de sincronização Toda mutação vira um item numa fila persistida: Um worker drena a fila quando há conexão, com backoff exponencial. Se o app fecha no meio, a fila continua de onde parou. Conflitos A regra que menos dói na maioria dos casos: last write wins por campo , com do servidor como árbitro. Para dados críticos, vale um merge manual com tela de revisão — mas não comece por aí, só adicione quando o negócio pedir. Armadilhas 1. mente. \"Conectado\" não é \"a API responde\". Confie no resultado da request, não no status da rede. 2. IDs do servidor. Gere um no cliente e mapeie para o id do servidor depois. Nunca espere o round trip para deixar o usuário seguir. 3. Migrações de schema local. Versione o banco local desde o dia 1. Offline first é mais sobre disciplina de estado do que sobre uma biblioteca mágica."
+  }
+]

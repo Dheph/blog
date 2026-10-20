@@ -1,0 +1,13 @@
+{
+  "name": "blog",
+  "version": "1.0.0",
+  "description": "Blog pessoal estático gerenciado por git — posts em Markdown, deploy no GitHub Pages.",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "new": "node scripts/new.mjs",
+    "dev": "node scripts/build.mjs && node --eval \"import('node:http').then(({createServer})=>import('node:fs').then(fs=>import('node:path').then(path=>{const t={'.html':'text/html','.css':'text/css','.js':'text/javascript','.json':'application/json','.md':'text/markdown','.svg':'image/svg+xml'};createServer((q,r)=>{let u=decodeURIComponent(q.url.split('?')[0]);if(u==='/')u='/index.html';const f=path.join(process.cwd(),u);fs.readFile(f,(e,d)=>{if(e){r.writeHead(404);return r.end('404')}r.writeHead(200,{'content-type':t[path.extname(f)]||'application/octet-stream'});r.end(d)})}).listen(5173,()=>console.log('→ http://localhost:5173'))})))\"",
+    "preview": "npm run dev"
+  }
+}
