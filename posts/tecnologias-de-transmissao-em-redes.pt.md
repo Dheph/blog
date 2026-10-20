@@ -1,6 +1,6 @@
 ---
 title: "Tecnologias de transmissão em redes: difusão e ponto a ponto"
-date: 2021-01-26
+date: 2026-10-19
 tags: [redes, fundamentos]
 description: "Classifico redes por tecnologia de transmissão e por escala — e mostro, com um diagrama animado, a diferença entre difusão e ponto a ponto."
 ---

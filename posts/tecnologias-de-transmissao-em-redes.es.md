@@ -1,6 +1,6 @@
 ---
 title: "Tecnologías de transmisión en redes: difusión y punto a punto"
-date: 2021-01-26
+date: 2026-10-19
 tags: [redes, fundamentos]
 description: "Clasifico las redes por tecnología de transmisión y por escala — y muestro, con un diagrama animado, la diferencia entre difusión y punto a punto."
 ---

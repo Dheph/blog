@@ -1,6 +1,6 @@
 ---
 title: "Network transmission technologies: broadcast and point-to-point"
-date: 2021-01-26
+date: 2026-10-19
 tags: [networks, fundamentals]
 description: "I classify networks by transmission technology and by scale — and show, with an animated diagram, the difference between broadcast and point-to-point."
 ---

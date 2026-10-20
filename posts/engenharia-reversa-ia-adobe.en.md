@@ -1,6 +1,6 @@
 ---
 title: "Reverse engineering with AI: is Adobe dead?"
-date: 2026-10-19
+date: 2026-10-20
 tags: [ai, opinion, reverse-engineering]
 description: "AI made reverse engineering far cheaper, but it's no clone button. Adobe's real value lives where the binary can't reach."
 ---

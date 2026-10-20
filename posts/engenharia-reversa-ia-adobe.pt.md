@@ -1,6 +1,6 @@
 ---
 title: "Engenharia reversa com IA: a Adobe morreu?"
-date: 2026-10-19
+date: 2026-10-20
 tags: [ia, opiniao, engenharia-reversa]
 description: "A IA barateou muito a engenharia reversa, mas não é botão de clonar. O valor da Adobe mora onde o binário não alcança."
 ---

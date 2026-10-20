@@ -1,6 +1,6 @@
 ---
 title: "Ingeniería inversa con IA: ¿murió Adobe?"
-date: 2026-10-19
+date: 2026-10-20
 tags: [ia, opinion, ingenieria-inversa]
 description: "La IA abarató muchísimo la ingeniería inversa, pero no es un botón de clonar. El valor de Adobe vive donde el binario no llega."
 ---
